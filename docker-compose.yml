@@ -1,0 +1,74 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # Server Service (NestJS)
+  server:
+    build:
+      context: ./apps/server
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000" # Expose server port 3000 to the host
+    environment:
+      # Define environment variables needed by the server
+      # IMPORTANT: Use environment variables in your NestJS app (e.g., via @nestjs/config)
+      # to read these values. Don\'t hardcode connection details.
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      NODE_ENV: production
+      # Add any other required environment variables (API keys, etc.)
+      # JWT_SECRET: your_jwt_secret
+      # API_KEY: your_api_key
+    depends_on:
+      - db # Ensure the database is ready before starting the server
+    # volumes: # Commented out as no volumes are actively used here
+      # Mount server source code for development (optional, remove for pure production)
+      # - ./apps/server:/usr/src/app
+      # Exclude node_modules from being overwritten by the volume mount
+      # - /usr/src/app/node_modules
+      # Mount dist folder for development (only if using nodemon/watch mode in Docker)
+      # - /usr/src/app/dist
+    networks:
+      - app-network
+
+  # Client Service (React/Vite + Nginx)
+  client:
+    build:
+      context: ./apps/client
+      dockerfile: Dockerfile
+    ports:
+      - "80:80" # Expose Nginx port 80 to the host\'s port 80
+    environment:
+      # Define build-time environment variables if needed by Vite/React build process
+      # Example: VITE_API_URL: http://localhost:3000/api # Adjust if your server has an /api prefix
+      NODE_ENV: production
+    depends_on:
+      - server # Client might depend on the server being available (optional)
+    networks:
+      - app-network
+
+  # Database Service (PostgreSQL)
+  db:
+    image: postgres:15-alpine # Use a specific PostgreSQL version
+    ports:
+      - "5432:5432" # Expose PostgreSQL port 5432 (optional, only for host access)
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mydatabase} # Use host env var or default
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Persist data
+    networks:
+      - app-network
+    # Add healthcheck for better startup coordination (optional)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-user} -d $${POSTGRES_DB:-mydatabase}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data: # Define the named volume for data persistence
+
+networks:
+  app-network: # Define the network for services to communicate
+    driver: bridge 
