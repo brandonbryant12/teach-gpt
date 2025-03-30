@@ -8,6 +8,8 @@ import { ConfigModule } from '@nestjs/config';
 import { LlmModule } from './llm/llm.module';
 import { TtsModule } from './tts/tts.module';
 import { validate } from './config/env.validation';
+import { PodcastModule } from './podcast/podcast.module';
+import { ScraperModule } from './scraper/scraper.module';
 
 @Module({
   imports: [
@@ -21,6 +23,8 @@ import { validate } from './config/env.validation';
     UserModule,
     AuthModule,
     DrizzleModule,
+    ScraperModule,
+    PodcastModule,
   ],
   controllers: [AppController],
   providers: [AppService],
