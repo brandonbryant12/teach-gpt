@@ -96,3 +96,214 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+# Teach-GPT Server Application
+
+This is the backend server for the Teach-GPT application, built with NestJS, Drizzle ORM, Passport, and PostgreSQL.
+
+## Development Setup
+
+Follow these steps to set up the server for local development.
+
+### Prerequisites
+
+*   Node.js (Check `.nvmrc` or `package.json` engines for recommended version)
+*   npm (or yarn/pnpm)
+*   Docker Desktop (for running the database and application in containers)
+*   Git
+
+### 1. Clone the Repository
+
+```bash
+# If you haven't already, clone the main repository
+# git clone <repository_url>
+# cd <repository_name>/apps/server
+```
+
+### 2. Install Dependencies
+
+Navigate to the `apps/server` directory if you aren't already there, and install the required npm packages:
+
+```bash
+npm install
+```
+
+### 3. Environment Variables
+
+Create a `.env` file in the `apps/server` directory. This file is used for local development outside of Docker and for Drizzle Kit commands.
+
+```dotenv
+# .env
+
+# For local development connection (if running db outside docker-compose)
+# Ensure the user, password, port, and db name match your local setup or docker-compose override if needed.
+DATABASE_URL=postgresql://user:password@localhost:5432/mydatabase
+
+# Add other environment variables like JWT secrets later
+# JWT_SECRET=your_super_secret_key
+# JWT_EXPIRATION_TIME=3600s
+```
+
+**Important:** The `DATABASE_URL` in the `.env` file is primarily used by `drizzle-kit` commands run directly on your host machine and potentially if you run `npm run start:dev` without Docker Compose. When using `npm run dev:docker`, the `DATABASE_URL` defined within the `docker-compose.yml` file for the `api` service takes precedence inside the container, pointing to the `db` service.
+
+### 4. Database Setup & Migrations
+
+We use Drizzle ORM for database interaction and Drizzle Kit for migrations.
+
+**Option A: Using Docker (Recommended)**
+
+1.  Ensure Docker Desktop is running.
+2.  Start the database container:
+    ```bash
+    docker compose up db -d
+    ```
+3.  Generate the initial migration (or subsequent migrations if you change `src/db/schema.ts`):
+    ```bash
+    # This uses the DATABASE_URL from your .env file to connect
+    npm run db:generate
+    ```
+4.  Apply the migrations to the database running in Docker:
+    ```bash
+    # This also uses the DATABASE_URL from your .env file
+    npm run db:migrate 
+    ```
+    *(Note: `db:migrate` uses `drizzle-kit push`, suitable for development. For production, a more robust migration strategy is needed.)*
+
+**Option B: Local PostgreSQL Instance**
+
+If you have PostgreSQL running locally (not in Docker) configured with the same credentials/database name as in your `.env` file, you can skip starting the Docker `db` service and run `db:generate` and `db:migrate` directly against your local instance.
+
+### 5. Running the Application
+
+**Option A: Using Docker Compose (Recommended)**
+
+This command builds the API image (if necessary) and starts both the `api` and `db` services.
+
+```bash
+npm run dev:docker
+```
+
+The API will be available at `http://localhost:3000`.
+
+To stop and remove the containers:
+
+```bash
+npm run dev:docker:down
+```
+
+**Option B: Running Locally (Requires Local DB)**
+
+If you have a local PostgreSQL instance running and migrated (as per Step 4, Option B), you can run the NestJS development server directly:
+
+```bash
+npm run start:dev
+```
+
+The API will be available at `http://localhost:3000`.
+
+### Useful Development Commands
+
+*   `npm run lint`: Lint the codebase using ESLint.
+*   `npm run format`: Format the codebase using Prettier.
+*   `npm run test`: Run unit tests.
+*   `npm run test:watch`: Run unit tests in watch mode.
+*   `npm run db:studio`: Open Drizzle Studio (requires Docker DB or local DB to be running) to browse your database.
+
+## Production Deployment
+
+### 1. Build the Application
+
+Create a production-ready build in the `dist` folder:
+
+```bash
+npm run build
+```
+
+### 2. Environment Variables
+
+Ensure all required environment variables are set in your production environment. This **must** include:
+
+*   `DATABASE_URL`: Pointing to your **production** PostgreSQL database.
+*   `NODE_ENV=production` (Recommended for performance optimizations).
+*   Any secrets required (e.g., `JWT_SECRET`).
+
+**Do not** use `.env` files for production secrets. Use your deployment platform's secret management system.
+
+### 3. Database Migrations (Production)
+
+**Do not use `npm run db:migrate` (which uses `drizzle-kit push`) in production.** This command can potentially lead to data loss as it tries to make the database match the schema directly.
+
+Instead, you should:
+
+1.  Generate migration files during development (`npm run db:generate`).
+2.  Commit these migration files (`drizzle/migrations/*.sql`) to your repository.
+3.  Use a dedicated migration tool (like `node-pg-migrate`, Flyway, Liquibase, or integrate Drizzle Migrate into your deployment pipeline) to apply these SQL migration files sequentially to your production database during deployment.
+
+Example using Drizzle Migrate (you would need to add a script/logic for this):
+
+```typescript
+// somewhere in your deployment script or a dedicated migration script
+import { drizzle } from 'drizzle-orm/postgres-js';
+import { migrate } from 'drizzle-orm/postgres-js/migrator';
+import postgres from 'postgres';
+
+const connectionString = process.env.DATABASE_URL;
+const sql = postgres(connectionString, { max: 1 });
+const db = drizzle(sql);
+
+async function runMigrations() {
+  console.log("Running database migrations...");
+  await migrate(db, { migrationsFolder: './drizzle/migrations' });
+  console.log("Migrations applied successfully.");
+  await sql.end(); // Close the connection
+}
+
+runMigrations().catch((error) => {
+  console.error("Migration failed:", error);
+  process.exit(1);
+});
+```
+
+### 4. Running the Application
+
+**Option A: Using Node.js Directly**
+
+After building and ensuring the environment is configured, start the application:
+
+```bash
+npm run start:prod
+```
+
+You should use a process manager like PM2 or Nodemon (in production mode) to handle restarts and monitoring.
+
+**Option B: Using Docker**
+
+The provided `Dockerfile` uses a multi-stage build, resulting in a lean production image.
+
+1.  Build the production image:
+    ```bash
+    # Example: Tagging the image
+    docker build -t your-dockerhub-username/teach-gpt-server:latest .
+    ```
+2.  Push the image to a container registry (like Docker Hub, AWS ECR, Google GCR).
+3.  Deploy the image using your preferred orchestration tool (Docker Compose, Kubernetes, AWS ECS, etc.), ensuring the production environment variables (like `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV=production`) are correctly injected into the container.
+
+Example snippet for a production `docker-compose.prod.yml` (simplified):
+
+```yaml
+version: '3.8'
+services:
+  api:
+    image: your-dockerhub-username/teach-gpt-server:latest # Use the image you built and pushed
+    container_name: teach-gpt-api-prod
+    restart: always
+    ports:
+      - "8080:3000" # Map container port 3000 to host port 8080 (or configure a reverse proxy)
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${PROD_DATABASE_URL} # Inject from environment or secrets management
+      JWT_SECRET: ${PROD_JWT_SECRET}
+    # No volumes needed for src or node_modules in production image
+
+# Note: This assumes the database is managed separately in production.
+```
