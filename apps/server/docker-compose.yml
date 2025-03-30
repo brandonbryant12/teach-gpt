@@ -32,8 +32,16 @@ services:
       - "3000:3000" # Expose NestJS default port
     environment:
       DATABASE_URL: postgresql://user:password@db:5432/mydatabase
+      # Read JWT vars from the host environment (which should load from .env)
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_TIME: ${JWT_EXPIRATION_TIME}
     volumes:
       - /usr/src/app/node_modules # Avoid overriding node_modules in container
+    # Add env_file to explicitly load .env (optional but good practice)
+    env_file:
+      - .env
+    # Command to run migrations then start the app
+    command: sh -c "npm run db:migrate && npm run start:prod"
 
 volumes:
   postgres_data: # Persist database data 

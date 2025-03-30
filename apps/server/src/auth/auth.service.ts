@@ -5,15 +5,20 @@ import { PG_CONNECTION } from '../db/drizzle.constants';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import * as schema from '../db/schema'; // Adjust path as needed
 import { eq } from 'drizzle-orm';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
   constructor(
     @Inject(PG_CONNECTION) private db: PostgresJsDatabase<typeof schema>,
     private userService: UserService, // We might need user service later
+    private jwtService: JwtService,
   ) {}
 
-  async validateUser(email: string, pass: string): Promise<any> {
+  async validateUser(
+    email: string,
+    pass: string,
+  ): Promise<Omit<typeof schema.users.$inferSelect, 'passwordHash'> | null> {
     const usersResult = await this.db
       .select()
       .from(schema.users)
@@ -27,10 +32,18 @@ export class AuthService {
     const isPasswordMatching = await bcrypt.compare(pass, user.passwordHash);
 
     if (isPasswordMatching) {
-      const { ...result } = user;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { passwordHash, ...result } = user; // Exclude password hash
       return result;
     }
 
     return null;
+  }
+
+  login(user: Omit<typeof schema.users.$inferSelect, 'passwordHash'>) {
+    const payload = { email: user.email, sub: user.id };
+    return {
+      access_token: this.jwtService.sign(payload),
+    };
   }
 }
