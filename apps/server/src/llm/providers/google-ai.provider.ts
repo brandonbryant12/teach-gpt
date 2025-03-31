@@ -5,9 +5,8 @@ import {
   GoogleGenerativeAI,
   HarmCategory,
   HarmBlockThreshold,
-  GenerateContentRequest,
   Part,
-} from '@google/generative-ai'; // Requires '@google/generative-ai' package
+} from '@google/generative-ai';
 import { ILlmProvider } from '../llm.interface';
 import { LlmGenerationOptions } from '../llm.options';
 import { LlmError } from '../llm.error';
@@ -141,11 +140,6 @@ export class GoogleAiProvider implements ILlmProvider {
     this.logger.debug('Generating JSON response via Google AI');
 
     const modelName = options?.modelOverride || this.defaultModel;
-    // Ensure the model supports JSON output - check Gemini documentation
-    // Models like gemini-1.5-pro often support JSON mode better
-    // if (modelName !== 'gemini-1.5-pro-latest') {
-    //   this.logger.warn(`Model ${modelName} might not fully support JSON mode.`);
-    // }
     const model = this.genAI.getGenerativeModel({ model: modelName });
 
     const generationConfig = {
@@ -155,7 +149,6 @@ export class GoogleAiProvider implements ILlmProvider {
     };
 
     const safetySettings = [
-      // Same safety settings as text generation
       {
         category: HarmCategory.HARM_CATEGORY_HARASSMENT,
         threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
@@ -174,25 +167,33 @@ export class GoogleAiProvider implements ILlmProvider {
       },
     ];
 
-    // Construct the request parts, including system prompt if provided
+    // --- Prompt Construction Logic ---
     const parts: Part[] = [];
-    // System prompt handling (similar to text, prepending for simplicity)
+    let systemInstruction =
+      'You are a helpful assistant designed to output JSON. Ensure your response is valid JSON formatted according to the user instructions.';
+
+    // Use provided system prompt if available
     if (options?.systemPrompt) {
+      systemInstruction = options.systemPrompt;
       this.logger.warn(
-        'Google AI provider currently prepends systemPrompt to the user prompt for JSON generation.',
+        'Google AI provider currently includes systemPrompt within the user message parts for JSON generation.',
       );
-      parts.push({ text: options.systemPrompt });
-    } else {
-      // Add a default instruction for JSON if no system prompt
-      parts.push({
-        text: 'You are a helpful assistant designed to output JSON. Ensure your response is valid JSON formatted according to the user instructions.',
-      });
     }
-    parts.push({ text: prompt }); // The main prompt instructing the desired JSON structure
+
+    // Append schema description if provided
+    if (options?.jsonSchemaDescription) {
+      systemInstruction += `\n\nThe required JSON output structure is described as follows:\n${options.jsonSchemaDescription}`;
+    }
+
+    // Add the combined system instructions/schema description as the first part
+    parts.push({ text: systemInstruction });
+    // Add the main user prompt as the next part
+    parts.push({ text: prompt });
+    // --- End Prompt Construction Logic ---
 
     try {
       const result = await model.generateContent({
-        contents: [{ role: 'user', parts }],
+        contents: [{ role: 'user', parts }], // Send combined instructions and prompt
         generationConfig,
         safetySettings,
       });

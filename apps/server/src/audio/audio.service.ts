@@ -1,115 +1,70 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import * as ffmpeg from 'fluent-ffmpeg';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { v4 as uuidv4 } from 'uuid';
-import * as os from 'os';
 import { PG_CONNECTION } from '../db/drizzle.constants';
 import * as schema from '../db/schema'; // Import the whole schema
 import { NodePgDatabase } from 'drizzle-orm/node-postgres'; // Import the DB type
 import { eq } from 'drizzle-orm';
+import { ConfigService } from '@nestjs/config'; // Keep ConfigService
 
 @Injectable()
 export class AudioService {
   private readonly logger = new Logger(AudioService.name);
 
   constructor(
-    @Inject(PG_CONNECTION) private db: NodePgDatabase<typeof schema>, // Use imported schema type
+    @Inject(PG_CONNECTION) private db: NodePgDatabase<typeof schema>,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
-   * Stitches multiple MP3 audio segments together into a single MP3 file.
+   * Stitches multiple MP3 audio segments together into a single MP3 file **in memory**.
+   *
+   * **WARNING:** Simple buffer concatenation for MP3s is often unreliable and can
+   * result in corrupted files, especially if segments have different properties
+   * (bitrate, sample rate) or contain metadata (ID3 tags). Use with caution
+   * and test thoroughly. The ffmpeg-based approach is generally more robust.
+   *
    * @param audioSegments An array of Buffers, each containing MP3 audio data, in the desired order.
-   * @returns A Promise resolving to a Buffer containing the combined MP3 audio data.
-   * @throws Error if stitching fails.
+   * @returns A Buffer containing the combined MP3 audio data.
+   * @throws Error if no segments are provided or if concatenation fails.
    */
-  async stitchAudioSegments(audioSegments: Buffer[]): Promise<Buffer> {
+  stitchAudioSegments(audioSegments: Buffer[]): Buffer {
     if (!audioSegments || audioSegments.length === 0) {
+      this.logger.error('No audio segments provided for stitching.');
       throw new Error('No audio segments provided for stitching.');
     }
 
     if (audioSegments.length === 1) {
-      this.logger.log('Only one segment provided, returning it directly.');
+      this.logger.log(
+        'Only one segment provided, returning it directly (in-memory).',
+      );
       return audioSegments[0];
     }
 
-    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'audio-stitch-'));
-    const tempFilePaths: string[] = [];
-    const listFilePath = path.join(tempDir, 'mylist.txt');
-    const outputFilePath = path.join(tempDir, `output-${uuidv4()}.mp3`);
-    let fileContent = '';
-
-    this.logger.log(`Created temporary directory: ${tempDir}`);
+    this.logger.log(
+      `Attempting to stitch ${audioSegments.length} audio segments in memory using Buffer.concat.`,
+    );
+    this.logger.warn(
+      'Using simple Buffer.concat for MP3 stitching. This may lead to corrupted files. Consider using the ffmpeg approach for reliability.',
+    );
 
     try {
-      // 1. Write segments to temporary files and create the list file content
-      for (let i = 0; i < audioSegments.length; i++) {
-        const tempFilePath = path.join(tempDir, `segment-${i}.mp3`);
-        await fs.writeFile(tempFilePath, audioSegments[i]);
-        tempFilePaths.push(tempFilePath);
-        fileContent += `file '${path.basename(tempFilePath)}'\n`; // Use relative paths for ffmpeg list
-        this.logger.log(`Wrote segment ${i} to ${tempFilePath}`);
-      }
+      // --- In-Memory Concatenation ---
+      // This simply joins the byte arrays. It does not intelligently handle
+      // MP3 frame headers, metadata (ID3 tags), VBR headers, etc.
+      const combinedBuffer = Buffer.concat(audioSegments);
+      // -----------------------------
 
-      // 2. Write the list file for ffmpeg's concat demuxer
-      await fs.writeFile(listFilePath, fileContent);
-      this.logger.log(`Created ffmpeg list file: ${listFilePath}`);
-
-      // 3. Run ffmpeg to concatenate
-      await new Promise<void>((resolve, reject) => {
-        ffmpeg()
-          .input(listFilePath)
-          .inputOptions(['-f concat', '-safe 0']) // Use concat demuxer, -safe 0 allows relative paths in list
-          .outputOptions(['-c copy']) // Copy codec, avoids re-encoding
-          .output(outputFilePath)
-          .on('start', (commandLine) => {
-            this.logger.log('Spawned Ffmpeg with command: ' + commandLine);
-          })
-          .on('end', () => {
-            this.logger.log('Ffmpeg processing finished.');
-            resolve();
-          })
-          .on('error', (err) => {
-            const errorMessage =
-              err instanceof Error ? err.message : String(err);
-            this.logger.error(
-              `Error during ffmpeg processing: ${errorMessage}`,
-              err instanceof Error ? err.stack : undefined,
-            );
-            reject(new Error(`ffmpeg error: ${errorMessage}`));
-          })
-          .run();
-      });
-
-      // 4. Read the output file back into a buffer
-      this.logger.log(`Reading stitched output file: ${outputFilePath}`);
-      const outputBuffer = await fs.readFile(outputFilePath);
-
-      return outputBuffer;
+      this.logger.log(
+        `Successfully concatenated ${audioSegments.length} segments in memory. Resulting buffer size: ${combinedBuffer.length} bytes.`,
+      );
+      return combinedBuffer;
     } catch (error) {
-      this.logger.error('Error during audio stitching process:', error);
-      throw error; // Re-throw the error after logging
-    } finally {
-      // 5. Clean up temporary files and directory
-      this.logger.log(`Cleaning up temporary directory: ${tempDir}`);
-      try {
-        await fs.rm(tempDir, { recursive: true, force: true });
-        this.logger.log(`Successfully removed temporary directory: ${tempDir}`);
-      } catch (cleanupError) {
-        // Check if cleanupError is an Error object before logging
-        const errorMessage =
-          cleanupError instanceof Error
-            ? cleanupError.message
-            : String(cleanupError);
-        const stack =
-          cleanupError instanceof Error ? cleanupError.stack : undefined;
-
-        this.logger.error(
-          `Failed to clean up temporary directory ${tempDir}: ${errorMessage}`,
-          stack, // Provide stack trace separately
-        );
-        // Log cleanup error but don't throw, as the main operation might have succeeded/failed already
-      }
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(
+        `Error during in-memory audio stitching: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new Error(`In-memory stitching failed: ${errorMessage}`);
     }
   }
 

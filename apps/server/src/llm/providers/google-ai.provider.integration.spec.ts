@@ -77,5 +77,54 @@ describeOrSkip('GoogleAiProvider (Integration)', () => {
     }, 30000); // Increase timeout for real API call
   });
 
+  // Add tests for generateJsonResponse
+  describe('generateJsonResponse', () => {
+    it('should call the real Google AI API and return a JSON object', async () => {
+      const prompt =
+        'Generate a JSON object with a "greeting" key and value "hello world".';
+      interface SimpleJson {
+        greeting: string;
+      }
+
+      const result = await provider.generateJsonResponse<SimpleJson>(prompt, {
+        modelOverride: 'gemini-1.5-flash', // Use a model known to support JSON mode
+        temperature: 0.1,
+      });
+
+      console.log('Google AI JSON Response:', result); // Log response for debugging
+
+      expect(typeof result).toBe('object');
+      expect(result).toHaveProperty('greeting');
+      // Basic check, the exact value might vary slightly
+      expect(result.greeting.toLowerCase()).toContain('hello');
+    }, 30000); // Increase timeout
+
+    it('should accept jsonSchemaDescription option without error', async () => {
+      const prompt =
+        'Generate a JSON object representing a user with name and age.';
+      const schemaDesc = 'interface User { name: string; age: number; }';
+      interface User {
+        name: string;
+        age: number;
+      }
+
+      // We mainly test that providing the option doesn't cause an API error
+      // The LLM's adherence to the schema is harder to guarantee in an integration test
+      const result = await provider.generateJsonResponse<User>(prompt, {
+        modelOverride: 'gemini-1.5-flash',
+        temperature: 0.1,
+        jsonSchemaDescription: schemaDesc, // Provide the schema description
+      });
+
+      console.log('Google AI JSON Response (with schema):', result);
+
+      expect(typeof result).toBe('object');
+      expect(result).toHaveProperty('name');
+      expect(result).toHaveProperty('age');
+      expect(typeof result.name).toBe('string');
+      expect(typeof result.age).toBe('number');
+    }, 30000); // Increase timeout
+  });
+
   // Add tests for other methods like generateJsonResponse if applicable
 });

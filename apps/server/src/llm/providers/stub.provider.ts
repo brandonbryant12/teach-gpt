@@ -36,6 +36,12 @@ export class StubLlmProvider implements ILlmProvider {
       options,
     );
 
+    if (options?.jsonSchemaDescription) {
+      this.logger.debug(
+        `[STUB] Received JSON schema description: ${options.jsonSchemaDescription.substring(0, 100)}...`,
+      );
+    }
+
     if (!options?.jsonMode) {
       this.logger.warn(
         '[STUB] jsonMode was not explicitly requested in options, but generateJsonResponse was called.',

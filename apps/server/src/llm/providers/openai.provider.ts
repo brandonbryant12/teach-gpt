@@ -93,36 +93,30 @@ export class OpenAiProvider implements ILlmProvider {
     this.ensureClientInitialized();
     this.logger.debug('Generating JSON response via OpenAI');
 
-    if (!options?.jsonMode) {
-      this.logger.warn(
-        'jsonMode was not explicitly passed for generateJsonResponse with OpenAI. Enabling it.',
-      );
-    }
-
     const model = options?.modelOverride || this.defaultModel;
     const messages: OpenAI.ChatCompletionMessageParam[] = [];
 
+    let systemContent =
+      'You are a helpful assistant designed to output JSON. Ensure your response is valid JSON formatted according to the user instructions.';
+
     if (options?.systemPrompt) {
-      messages.push({ role: 'system', content: options.systemPrompt });
-    } else {
-      // Add a default system prompt if none provided, instructing JSON output
-      messages.push({
-        role: 'system',
-        content:
-          'You are a helpful assistant designed to output JSON. Ensure your response is valid JSON formatted according to the user instructions.',
-      });
+      systemContent = options.systemPrompt;
     }
+
+    if (options?.jsonSchemaDescription) {
+      systemContent += `\n\nThe required JSON output structure is described as follows:\n${options.jsonSchemaDescription}`;
+    }
+
+    messages.push({ role: 'system', content: systemContent });
     messages.push({ role: 'user', content: prompt });
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const completion = await this.client.chat.completions.create({
         model: model,
         messages: messages,
         max_tokens: options?.maxTokens,
         temperature: options?.temperature,
-        response_format: { type: 'json_object' }, // Enable OpenAI JSON mode
-        // Add other supported OpenAI parameters from options if needed
+        response_format: { type: 'json_object' },
       });
 
       const content = completion.choices[0]?.message?.content;
@@ -143,7 +137,7 @@ export class OpenAiProvider implements ILlmProvider {
       } catch (parseError: any) {
         this.logger.error(
           `Failed to parse JSON response from OpenAI: ${parseError.message}`,
-          content, // Log the raw content for debugging
+          content,
         );
         throw new LlmError(
           `OpenAI returned invalid JSON: ${parseError.message}`,

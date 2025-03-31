@@ -1,6 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsOptional, IsString, validateSync } from 'class-validator';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  validateSync,
+  IsNotEmpty,
+  IsNumber,
+} from 'class-validator';
 
 enum Environment {
   Development = 'development',
@@ -23,6 +30,7 @@ class EnvironmentVariables {
   NODE_ENV: Environment = Environment.Development;
 
   @IsString()
+  @IsNotEmpty()
   DATABASE_URL: string;
 
   // LLM Configuration
@@ -52,6 +60,23 @@ class EnvironmentVariables {
   // @IsString()
   // @IsOptional()
   // GOOGLE_API_KEY?: string;
+
+  // --- Add JWT Validation ---
+  @IsString()
+  @IsNotEmpty()
+  JWT_SECRET: string;
+
+  @IsString()
+  @IsNotEmpty()
+  JWT_EXPIRATION_TIME: string;
+  // --- End JWT Validation ---
+
+  @IsNumber()
+  @IsOptional()
+  PORT: number = 3000;
+
+  @IsString()
+  FFMPEG_PATH: string;
 }
 
 export function validate(config: Record<string, unknown>) {
@@ -62,55 +87,37 @@ export function validate(config: Record<string, unknown>) {
     skipMissingProperties: false,
   });
 
-  if (errors.length > 0) {
-    // Check for conditional requirements
-    if (
-      validatedConfig.LLM_PROVIDER === LlmProvider.OpenAI &&
-      !validatedConfig.OPENAI_API_KEY
-    ) {
-      errors.push(
-        ...validateSync(
-          { OPENAI_API_KEY: validatedConfig.OPENAI_API_KEY },
-          {
-            forbidNonWhitelisted: true,
-            whitelist: true,
-            forbidUnknownValues: true,
-          },
-        ), // Simulate validation failure for missing key
-      );
-      console.error(
-        'Error: OPENAI_API_KEY is required when LLM_PROVIDER is set to "openai"',
-      );
-    }
-    if (
-      validatedConfig.LLM_PROVIDER === LlmProvider.GoogleAI &&
-      !validatedConfig.GOOGLE_API_KEY
-    ) {
-      errors.push(
-        ...validateSync(
-          { GOOGLE_API_KEY: validatedConfig.GOOGLE_API_KEY },
-          {
-            forbidNonWhitelisted: true,
-            whitelist: true,
-            forbidUnknownValues: true,
-          },
-        ), // Simulate validation failure for missing key
-      );
-      console.error(
-        'Error: GOOGLE_API_KEY is required when LLM_PROVIDER is set to "google-ai"',
-      );
-    }
-    // Add similar checks for other providers...
+  // --- Combine error checks ---
+  const conditionalErrors: string[] = [];
 
-    // If errors still exist after conditional checks:
-    if (errors.length > 0) {
-      throw new Error(
-        `Environment variable validation failed:\n${errors
-          .map((error) => Object.values(error.constraints || {}))
-          .flat()
-          .join('\n')}`,
-      );
-    }
+  if (
+    validatedConfig.LLM_PROVIDER === LlmProvider.OpenAI &&
+    !validatedConfig.OPENAI_API_KEY
+  ) {
+    conditionalErrors.push(
+      'OPENAI_API_KEY is required when LLM_PROVIDER is set to "openai"',
+    );
+  }
+  if (
+    validatedConfig.LLM_PROVIDER === LlmProvider.GoogleAI &&
+    !validatedConfig.GOOGLE_API_KEY
+  ) {
+    conditionalErrors.push(
+      'GOOGLE_API_KEY is required when LLM_PROVIDER is set to "google-ai"',
+    );
+  }
+  // Add similar checks for other providers...
+
+  if (errors.length > 0 || conditionalErrors.length > 0) {
+    const validationErrorMessages = errors
+      .map((error) => Object.values(error.constraints || {}))
+      .flat();
+
+    const allErrors = [...validationErrorMessages, ...conditionalErrors];
+
+    throw new Error(
+      `Environment variable validation failed:\n- ${allErrors.join('\n- ')}`,
+    );
   }
 
   // Extra validation: ensure API key exists if provider is selected

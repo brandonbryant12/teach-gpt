@@ -32,6 +32,7 @@ interface InternalLlmTextResponse {
 // Assume JSON request is similar, but maybe has a 'json_mode: true' flag
 interface InternalLlmJsonRequest extends InternalLlmTextRequest {
   json_mode?: boolean; // Example flag
+  schema_description?: string; // New field for schema description
 }
 
 @Injectable()
@@ -174,12 +175,17 @@ export class InternalProvider implements ILlmProvider {
       ...(options?.systemPrompt && { system_prompt: options.systemPrompt }),
       ...(options?.maxTokens && { max_tokens: options.maxTokens }),
       ...(options?.temperature && { temperature: options.temperature }),
+      ...(options?.jsonSchemaDescription && {
+        // Add schema if provided
+        schema_description: options.jsonSchemaDescription,
+      }),
     };
 
     try {
       const response = await firstValueFrom(
         // Assuming the response body *is* the JSON object directly
         this.httpService.post<T>(this.llmUrl, requestBody, {
+          // Send updated requestBody
           headers: { Authorization: `Bearer ${token}` },
           // Consider adding a timeout
           // timeout: this.configService.get<number>('INTERNAL_LLM_TIMEOUT', 60000),
@@ -203,8 +209,6 @@ export class InternalProvider implements ILlmProvider {
       );
       return jsonData;
     } catch (error: any) {
-      // Catching potential JSON parsing errors is harder here if Axios fails
-      // Axios might throw if the response Content-Type is wrong or status indicates error
       this.handleInternalLlmError(error, 'generateJsonResponse');
     }
   }

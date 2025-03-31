@@ -38,6 +38,24 @@ interface JobCompletionState {
 }
 const jobCompletionTracker = new Map<number, JobCompletionState>();
 
+// Define schema descriptions based on the DTOs
+const summarySchemaDescription = `
+Interface Summary {
+  title: string; // A concise title for the summary.
+  summaryPoints: string[]; // An array of key takeaways or bullet points summarizing the content.
+}`;
+
+const dialogueSchemaDescription = `
+Interface Segment {
+  speaker: string; // Identifier for the speaker (e.g., "Host 1", "Host 2", "Narrator").
+  text: string; // The spoken text for this segment.
+}
+
+Interface Dialogue {
+  title: string; // The title of the podcast episode or discussion.
+  segments: Segment[]; // An array of dialogue segments representing the conversation flow.
+}`;
+
 @Injectable()
 export class PodcastService {
   private readonly logger = new Logger(PodcastService.name);
@@ -231,30 +249,31 @@ export class PodcastService {
     );
 
     try {
-      // Prepare LLM Prompts (Placeholders - customize based on deepDiveOption)
-      const summaryPrompt = `Generate a concise summary for the following article titled "${title}". Focus on the key takeaways. 
+      // Prepare LLM Prompts
+      const summaryPrompt = `Generate a concise summary for the following article titled "${title}". Focus on the key takeaways. Output should be JSON matching the provided schema.
 
 Article Text:
 ${bodyText.substring(0, 8000)}`; // Limit text length if needed
-      const dialoguePrompt = `Create a conversational dialogue transcript based on the article titled "${title}". Imagine two hosts discussing the main points. Make it engaging. 
+
+      const dialoguePrompt = `Create a conversational dialogue transcript based on the article titled "${title}". Imagine two hosts discussing the main points. Make it engaging and follow the provided JSON schema.
 
 Article Text:
 ${bodyText.substring(0, 8000)}`; // Limit text length
 
-      // You might want to adjust prompts based on deepDiveOption here
-      // if (deepDiveOption === 'DEEP') { ... adjust prompts ... }
-      // else if (deepDiveOption === 'SUMMARY_ONLY') { ... } // Might skip dialogue
-
-      // Invoke LLM Service (Parallel)
+      // Invoke LLM Service (Parallel) with schema descriptions
       this.logger.log(
-        `Job ID: ${jobId} - Calling LLM for summary and dialogue.`,
+        `Job ID: ${jobId} - Calling LLM for summary and dialogue with schema descriptions.`,
       );
       const [summaryResult, dialogueResult] = await Promise.all([
         this.llmService.generateJsonResponse<Summary>(summaryPrompt, {
-          /* options */
+          // Provide the schema description for Summary
+          jsonSchemaDescription: summarySchemaDescription,
+          // Add other options like modelOverride, temperature if needed
         }),
         this.llmService.generateJsonResponse<Dialogue>(dialoguePrompt, {
-          /* options */
+          // Provide the schema description for Dialogue
+          jsonSchemaDescription: dialogueSchemaDescription,
+          // Add other options like modelOverride, temperature if needed
         }),
       ]);
       this.logger.log(

@@ -26,7 +26,18 @@
     "dev:docker:down": "docker compose down"
   },
   "dependencies": {
+    "@google-cloud/text-to-speech": "^6.0.1",
+    "@google/generative-ai": "^0.24.0",
+    "@mozilla/readability": "^0.6.0",
+    "@nestjs/axios": "^4.0.0",
+    "@nestjs/cache-manager": "^3.0.1",
+    "@nestjs/common": "^11.0.12",
+    "@nestjs/config": "^4.0.2",
     "@nestjs/event-emitter": "^3.0.1",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/mapped-types": "^2.1.0",
+    "@nestjs/passport": "^11.0.5",
+    "@nestjs/swagger": "^11.1.0",
     "@types/fluent-ffmpeg": "^2.1.27",
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",

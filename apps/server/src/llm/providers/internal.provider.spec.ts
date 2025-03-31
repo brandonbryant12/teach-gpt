@@ -390,22 +390,26 @@ describe('InternalProvider', () => {
       expect(result).toEqual(expectedResponse);
       expect(httpService.post).toHaveBeenCalledWith(
         FAKE_LLM_URL,
-        {
+        expect.objectContaining({
+          // Check relevant fields
           prompt: prompt,
           json_mode: true,
-        },
+          // schema_description should be undefined here
+        }),
         {
           headers: { Authorization: `Bearer ${FAKE_TOKEN}` },
         },
       );
     });
 
-    it('should include other options in JSON request', async () => {
+    it('should include other options AND schema_description in JSON request', async () => {
       const prompt = 'Test JSON prompt';
+      const schemaDesc = 'interface Result { value: string; }';
       const options = {
         temperature: 0.6,
         systemPrompt: 'Sys JSON',
         maxTokens: 200,
+        jsonSchemaDescription: schemaDesc, // Add schema description to options
       };
       const expectedResponse = { data: 'test' };
       mockHttpService.post.mockReturnValue(
@@ -417,11 +421,13 @@ describe('InternalProvider', () => {
       expect(httpService.post).toHaveBeenCalledWith(
         FAKE_LLM_URL,
         {
+          // Expect the full request body
           prompt: prompt,
           json_mode: true,
           temperature: options.temperature,
           system_prompt: options.systemPrompt,
           max_tokens: options.maxTokens,
+          schema_description: schemaDesc, // Verify schema description is included
         },
         { headers: { Authorization: `Bearer ${FAKE_TOKEN}` } },
       );
