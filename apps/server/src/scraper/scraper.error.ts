@@ -9,11 +9,10 @@ export class ScraperError extends Error {
       | 'TIMEOUT'
       | 'OTHER',
     public originalError?: Error,
-    public statusCode?: number, // Optional HTTP status if relevant to FETCH_FAILED
+    public statusCode?: number,
   ) {
     super(message);
     this.name = 'ScraperError';
-    // Ensure the prototype chain is correct for instanceof checks
     Object.setPrototypeOf(this, ScraperError.prototype);
 
     if (Error.captureStackTrace) {

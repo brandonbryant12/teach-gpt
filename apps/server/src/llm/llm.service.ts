@@ -3,6 +3,8 @@ import { ILlmProvider, LLM_PROVIDER } from './llm.interface';
 import { LlmGenerationOptions } from './llm.options';
 import { LlmError } from './llm.error';
 
+export { LlmError };
+
 @Injectable()
 export class LlmService {
   private readonly logger = new Logger(LlmService.name);
@@ -64,7 +66,6 @@ export class LlmService {
         effectiveOptions,
       );
       this.logger.debug(`Received JSON response`);
-      // Basic validation - provider should ideally handle parsing
       if (typeof response !== 'object' || response === null) {
         throw new LlmError(
           'LLM provider returned non-object response for JSON request.',
@@ -87,15 +88,18 @@ export class LlmService {
         `LLM provider error in ${methodName} (${error.type}): ${error.message}`,
         error.stack,
       );
-      throw error; // Re-throw known LlmError
+      throw error;
     } else {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
       this.logger.error(
-        `Unexpected error during LLM provider call in ${methodName}: ${error.message}`,
-        error.stack,
+        `Unexpected error during LLM provider call in ${methodName}: ${errorMessage}`,
+        errorStack,
       );
-      // Wrap unexpected errors
       throw new LlmError(
-        `An unexpected error occurred in the LLM provider: ${error.message}`,
+        `An unexpected error occurred in the LLM provider: ${errorMessage}`, // Use safe message
         'OTHER',
         error instanceof Error ? error : undefined,
       );

@@ -1,5 +1,4 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { UserService } from '../user/user.service';
 import * as bcrypt from 'bcrypt';
 import { PG_CONNECTION } from '../db/drizzle.constants';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
@@ -11,7 +10,6 @@ import { JwtService } from '@nestjs/jwt';
 export class AuthService {
   constructor(
     @Inject(PG_CONNECTION) private db: PostgresJsDatabase<typeof schema>,
-    private userService: UserService, // We might need user service later
     private jwtService: JwtService,
   ) {}
 
@@ -32,8 +30,7 @@ export class AuthService {
     const isPasswordMatching = await bcrypt.compare(pass, user.passwordHash);
 
     if (isPasswordMatching) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { passwordHash, ...result } = user; // Exclude password hash
+      const { ...result } = user;
       return result;
     }
 

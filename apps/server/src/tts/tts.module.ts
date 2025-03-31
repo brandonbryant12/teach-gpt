@@ -20,14 +20,7 @@ export class TtsModule {
   static forRoot(): DynamicModule {
     const ttsProviderFactory: Provider = {
       provide: TTS_PROVIDER_SERVICE,
-      useFactory: (
-        configService: ConfigService,
-        openAiProvider: OpenAiTtsProvider,
-        // --- Inject Azure Provider ---
-        azureProvider: AzureTtsProvider,
-        // --- Inject Google Provider ---
-        googleProvider: GoogleCloudTtsProvider,
-      ): ITtsProvider => {
+      useFactory: (configService: ConfigService): ITtsProvider => {
         const providerName = (
           configService.get<string>('TTS_PROVIDER') || 'openai'
         ).toLowerCase();
@@ -38,54 +31,29 @@ export class TtsModule {
 
         switch (providerName) {
           case 'openai':
-            return openAiProvider;
-          // case 'google-cloud-tts':
-          //   return googleProvider;
-          // --- Add Azure Case ---
-          case 'azure': // Or use 'microsoft-cognitiveservices-speech-sdk' or similar if preferred
-            return azureProvider;
-          // --- Add Google Case ---
-          case 'google': // Or use 'google-cloud-tts' if preferred
-            return googleProvider;
+            this.logger.log('Using OpenAI TTS provider.');
+            return new OpenAiTtsProvider(configService);
+          case 'azure':
+            this.logger.log('Using Azure TTS provider.');
+            return new AzureTtsProvider(configService);
+          case 'google':
+            this.logger.log('Using Google Cloud TTS provider.');
+            return new GoogleCloudTtsProvider();
           default:
             this.logger.warn(
               `Unsupported TTS_PROVIDER specified: '${providerName}'. Defaulting to 'openai'.`,
             );
-            // Optionally throw an error if default is not desired:
-            // throw new Error(`Unsupported TTS_PROVIDER: ${providerName}`);
-            return openAiProvider; // Default to OpenAI
+            return new OpenAiTtsProvider(configService);
         }
       },
-      inject: [
-        ConfigService,
-        OpenAiTtsProvider,
-        // --- Add Azure Provider to Injection List ---
-        AzureTtsProvider,
-        // --- Add Google Provider to Injection List ---
-        GoogleCloudTtsProvider,
-      ],
+      inject: [ConfigService],
     };
 
     return {
       module: TtsModule,
-      imports: [
-        ConfigModule, // Ensure ConfigModule is imported to access ConfigService
-      ],
-      providers: [
-        TtsService,
-        // Register all possible provider implementations so they can be injected
-        // into the factory. NestJS handles instantiation.
-        OpenAiTtsProvider,
-        // GoogleCloudTtsProvider,
-        // --- Register Azure Provider ---
-        AzureTtsProvider, // Add Azure provider here
-        // --- Register Google Provider ---
-        GoogleCloudTtsProvider, // Add Google provider here
-        ttsProviderFactory, // The factory provider itself
-      ],
-      exports: [
-        TtsService, // Export TtsService for use in other modules
-      ],
+      imports: [ConfigModule],
+      providers: [TtsService, ttsProviderFactory],
+      exports: [TtsService],
     };
   }
 }

@@ -11,5 +11,4 @@ export interface ILlmProvider {
   ): Promise<T>;
 }
 
-// Injection token for the dynamic provider
 export const LLM_PROVIDER = 'LLM_PROVIDER';

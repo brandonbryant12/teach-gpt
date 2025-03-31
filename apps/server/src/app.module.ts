@@ -10,6 +10,7 @@ import { TtsModule } from './tts/tts.module';
 import { validate } from './config/env.validation';
 import { PodcastModule } from './podcast/podcast.module';
 import { ScraperModule } from './scraper/scraper.module';
+import { AudioModule } from './audio/audio.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ScraperModule } from './scraper/scraper.module';
     DrizzleModule,
     ScraperModule,
     PodcastModule,
+    AudioModule,
   ],
   controllers: [AppController],
   providers: [AppService],

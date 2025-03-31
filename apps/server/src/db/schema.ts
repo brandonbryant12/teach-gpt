@@ -3,12 +3,19 @@ import {
   serial,
   text,
   timestamp,
-  varchar,
   jsonb,
   pgEnum,
   integer,
+  customType,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+
+// Define custom type for bytea
+const bytea = customType<{ data: Buffer }>({
+  dataType() {
+    return 'bytea';
+  },
+});
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -67,6 +74,7 @@ export const podcasts = pgTable('podcasts', {
   summary: jsonb('summary'),
   transcript: jsonb('transcript'),
   audioUrl: text('audio_url'),
+  audioData: bytea('audio_data'),
   jobMetadata: jsonb('job_metadata'),
 });
 

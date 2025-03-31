@@ -5,11 +5,11 @@ import { ScraperService } from './scraper.service';
 @Module({
   imports: [
     HttpModule.register({
-      timeout: 15000, // Default timeout for HTTP requests in this module
-      maxRedirects: 5, // Default max redirects
+      timeout: 15000,
+      maxRedirects: 5,
     }),
   ],
   providers: [ScraperService],
-  exports: [ScraperService], // Export if other modules need to inject it
+  exports: [ScraperService],
 })
 export class ScraperModule {}

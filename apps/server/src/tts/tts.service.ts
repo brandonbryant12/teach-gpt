@@ -7,6 +7,9 @@ import {
 import { TtsGenerationOptions } from './dto/tts-generation-options.dto';
 import { TtsError } from './errors/tts.error';
 import { ConfigService } from '@nestjs/config';
+
+export { TtsError }; // Re-export TtsError
+
 // Import providers if accessing their specific methods (not needed for current mapping)
 // import { AzureTtsProvider } from './providers/azure-tts.provider';
 // import { GoogleCloudTtsProvider } from './providers/google-cloud-tts.provider';
